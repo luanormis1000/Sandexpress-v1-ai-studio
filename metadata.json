@@ -1,0 +1,6 @@
+{
+  "name": "SandExpress",
+  "description": "Plataforma de pedidos para quiosques de praia via QR Code.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
