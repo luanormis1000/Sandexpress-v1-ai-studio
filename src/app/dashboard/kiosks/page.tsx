@@ -21,6 +21,8 @@ interface Kiosk {
   id: string;
   name: string;
   slug: string;
+  beach_name?: string;
+  location_city?: string;
   created_at: string;
 }
 
@@ -29,7 +31,12 @@ export default function KioskManagement() {
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newKiosk, setNewKiosk] = useState({ name: '', slug: '' });
+  const [newKiosk, setNewKiosk] = useState({ 
+    name: '', 
+    slug: '',
+    beach_name: '',
+    location_city: ''
+  });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -75,7 +82,12 @@ export default function KioskManagement() {
     try {
       const { data, error } = await supabase
         .from('vendors')
-        .insert({ name: newKiosk.name, slug })
+        .insert({ 
+          name: newKiosk.name, 
+          slug,
+          beach_name: newKiosk.beach_name,
+          location_city: newKiosk.location_city
+        })
         .select();
 
       if (error) {
@@ -86,7 +98,7 @@ export default function KioskManagement() {
 
       setKiosks([data[0], ...kiosks]);
       setShowAddModal(false);
-      setNewKiosk({ name: '', slug: '' });
+      setNewKiosk({ name: '', slug: '', beach_name: '', location_city: '' });
     } catch (err) {
       console.error('Erro ao criar quiosque:', err);
       setError('Erro ao criar quiosque.');
@@ -108,7 +120,7 @@ export default function KioskManagement() {
 
   return (
     <div className="min-h-screen bg-[#FDF8F3] p-6 lg:p-10 font-sans">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <Link href="/dashboard/pedidos" className="inline-flex items-center gap-2 text-orange-400 hover:text-primary mb-8 transition-colors font-bold text-xs uppercase tracking-widest">
           <ChevronLeft size={18} /> Voltar ao Painel
         </Link>
@@ -154,7 +166,10 @@ export default function KioskManagement() {
                 </div>
                 
                 <h3 className="text-xl font-black text-dark mb-1">{kiosk.name}</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-6">slug: {kiosk.slug}</p>
+                <div className="flex flex-col gap-1 mb-4">
+                  <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">{kiosk.beach_name} - {kiosk.location_city}</p>
+                  <p className="text-[9px] text-gray-400 font-medium tracking-tight overflow-hidden text-ellipsis italic">Slug: {kiosk.slug}</p>
+                </div>
                 
                 <div className="space-y-3">
                   <Link 
@@ -211,16 +226,40 @@ export default function KioskManagement() {
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Configure sua nova unidade</p>
               </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2">Nome Comercial</label>
-                  <input 
-                    type="text" 
-                    value={newKiosk.name}
-                    onChange={(e) => setNewKiosk({ ...newKiosk, name: e.target.value })}
-                    className="w-full px-5 py-4 rounded-2xl border border-orange-50 bg-orange-50/30 focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold"
-                    placeholder="Ex: Quiosque do Porto"
-                  />
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2">Nome Comercial</label>
+                    <input 
+                      type="text" 
+                      value={newKiosk.name}
+                      onChange={(e) => setNewKiosk({ ...newKiosk, name: e.target.value })}
+                      className="w-full px-5 py-4 rounded-2xl border border-orange-50 bg-orange-50/30 focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold"
+                      placeholder="Ex: Quiosque do Porto"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2">Praia</label>
+                    <input 
+                      type="text" 
+                      value={newKiosk.beach_name}
+                      onChange={(e) => setNewKiosk({ ...newKiosk, beach_name: e.target.value })}
+                      className="w-full px-5 py-4 rounded-2xl border border-orange-50 bg-orange-50/30 focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold text-sm"
+                      placeholder="Praia do Forte"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2">Cidade</label>
+                    <input 
+                      type="text" 
+                      value={newKiosk.location_city}
+                      onChange={(e) => setNewKiosk({ ...newKiosk, location_city: e.target.value })}
+                      className="w-full px-5 py-4 rounded-2xl border border-orange-50 bg-orange-50/30 focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold text-sm"
+                      placeholder="Cabo Frio"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -232,7 +271,7 @@ export default function KioskManagement() {
                     className="w-full px-5 py-4 rounded-2xl border border-orange-50 bg-orange-50/30 focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-xs"
                     placeholder="quiosque-do-porto"
                   />
-                  <p className="text-[9px] text-gray-300 mt-2">Deixe em branco para gerar automaticamente.</p>
+                  <p className="text-[9px] text-gray-300 mt-2">Personalize o link de acesso.</p>
                 </div>
 
                 {error && (

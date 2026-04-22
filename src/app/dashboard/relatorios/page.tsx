@@ -32,6 +32,7 @@ interface Order {
   created_at: string;
   total: number;
   status: string;
+  table_number: string;
   items: { name: string; quantity: number }[];
 }
 
@@ -82,7 +83,8 @@ export default function ReportsPage() {
   const totalOrders = orders.length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   
-  // Dados para gráfico de faturamento diário (simplificado)
+  // Total of unique umbrellas/tables served
+  const uniqueUmbrellas = new Set(orders.map(o => o.table_number)).size;
   const revenueByDay = orders.reduce((acc: any, o) => {
     const day = new Date(o.created_at).toLocaleDateString('pt-BR', { weekday: 'short' });
     acc[day] = (acc[day] || 0) + o.total;
@@ -91,7 +93,7 @@ export default function ReportsPage() {
 
   const barChartData = Object.entries(revenueByDay).map(([day, value]) => ({ day, value }));
 
-  // Itens mais vendidos
+  // Itens mais vendidos (Top 10)
   const itemsStats = orders.reduce((acc: any, o) => {
     o.items.forEach(item => {
       acc[item.name] = (acc[item.name] || 0) + item.quantity;
@@ -102,7 +104,7 @@ export default function ReportsPage() {
   const topItems = Object.entries(itemsStats)
     .map(([name, qty]: [any, any]) => ({ name, qty }))
     .sort((a, b) => b.qty - a.qty)
-    .slice(0, 5);
+    .slice(0, 10);
 
   if (loading && orders.length === 0) {
     return (
@@ -167,8 +169,8 @@ export default function ReportsPage() {
           isPositive={false}
         />
         <MetricCard 
-          label="Novos Clientes" 
-          value="142" 
+          label="Guarda-Sóis Ativos" 
+          value={uniqueUmbrellas.toString()} 
           icon={<Users className="text-purple-500" />}
           trend="+18.4%"
           isPositive={true}
