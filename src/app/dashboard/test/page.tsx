@@ -17,6 +17,7 @@ import {
   ExternalLink,
   ChevronRight,
   Monitor,
+  ShieldCheck,
   Menu as MenuIcon,
   BarChart,
   Settings,
@@ -32,38 +33,72 @@ export default function TestPlayground() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<{ id: number; message: string; type: 'info' | 'success' | 'error' }[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [selectedVendorId, setSelectedVendorId] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [vendors, setVendors] = useState<any[]>([]);
 
   useEffect(() => {
     fetchMenu();
+    fetchVendors();
   }, [supabase]);
+
+  const fetchVendors = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('vendors').select('*');
+    setVendors(data || []);
+    if (data && data.length > 0) setSelectedVendorId(data[0].id);
+  };
 
   const fetchMenu = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('menu_items').select('*').limit(5);
+    // Get menu for selected vendor or first one
+    const { data } = await supabase.from('menu_items').select('*').limit(10);
     setMenuItems(data || []);
   };
 
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setLogs(prev => [{ id: Date.now(), message, type }, ...prev].slice(0, 10));
+    setLogs(prev => [{ id: Date.now(), message, type }, ...prev].slice(0, 15));
+  };
+
+  const verifyAdmin = () => {
+    if (adminPassword !== 'Novasenha123@') {
+      alert('Senha do Admin incorreta!');
+      addLog('Tentativa de acesso negada: senha incorreta', 'error');
+      return false;
+    }
+    return true;
   };
 
   const simulateCustomerOrder = async () => {
-    if (!supabase || menuItems.length === 0) {
-      addLog('Nenhum item no cardápio para simular pedido', 'error');
+    if (!supabase) return;
+    
+    const targetVendorId = selectedVendorId || (vendors.length > 0 ? vendors[0].id : null);
+    if (!targetVendorId) {
+      addLog('Nenhum quiosque disponível para simular pedido', 'error');
+      return;
+    }
+
+    const vendorItems = menuItems.filter(i => i.vendor_id === targetVendorId);
+    const pool = vendorItems.length > 0 ? vendorItems : menuItems;
+
+    if (pool.length === 0) {
+      addLog('Nenhum item disponível para este quiosque', 'error');
       return;
     }
 
     setLoading(true);
-    addLog('Iniciando simulação de pedido...', 'info');
+    addLog(`Simulando pedido para Quiosque ID: ${targetVendorId.slice(0, 5)}...`, 'info');
 
     try {
-      const randomItem = menuItems[Math.floor(Math.random() * menuItems.length)];
-      const table = Math.floor(Math.random() * 20) + 1;
+      const randomItem = pool[Math.floor(Math.random() * pool.length)];
+      const table = Math.floor(Math.random() * 50) + 1;
       
       const { data, error } = await supabase
         .from('orders')
         .insert({
+          vendor_id: targetVendorId,
           table_number: table.toString(),
+          client_name: ['Luan', 'Maria', 'João', 'Ana', 'Carlos'][Math.floor(Math.random() * 5)],
           items: [{ name: randomItem.name, quantity: 1, id: randomItem.id }],
           total: randomItem.price,
           status: 'pendente'
@@ -71,15 +106,7 @@ export default function TestPlayground() {
         .select();
 
       if (error) throw error;
-      addLog(`Pedido #${data[0].id.slice(0, 4)} criado para mesa ${table}`, 'success');
-      
-      // Tocar som de teste se as notificações estiverem ativas
-      if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Teste de Pedido', {
-              body: `Novo pedido da mesa ${table}: ${randomItem.name}`,
-              icon: '/icon.png'
-          });
-      }
+      addLog(`Pedido #${data[0].id.slice(0, 4)} criado para G.Sol ${table}`, 'success');
     } catch (error: any) {
       addLog(`Erro ao criar pedido: ${error.message}`, 'error');
     } finally {
@@ -87,18 +114,49 @@ export default function TestPlayground() {
     }
   };
 
-  const cleanDatabase = async () => {
-    if (!supabase || !confirm('Deseja limpar todos os pedidos de teste?')) return;
+  const cleanDatabase = async (scope: 'vendor' | 'global') => {
+    if (!supabase || !verifyAdmin()) return;
+    
+    const msg = scope === 'global' 
+      ? 'Deseja limpar TODOS os dados de TODOS os quiosques? (Pedidos, Itens, Mapas)' 
+      : 'Deseja limpar todos os pedidos deste quiosque?';
+      
+    if (!confirm(msg)) return;
     
     setLoading(true);
-    addLog('Limpando base de pedidos...', 'info');
+    addLog(`Limpando base (${scope})...`, 'info');
     
     try {
-      const { error } = await supabase.from('orders').delete().neq('id', '0');
-      if (error) throw error;
-      addLog('Base de pedidos limpa com sucesso', 'success');
+      if (scope === 'global') {
+        // Clear everything
+        await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('menu_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        addLog('Sistema reinicializado: Todos os dados limpos', 'success');
+      } else {
+        if (!selectedVendorId) return;
+        const { error } = await supabase.from('orders').delete().eq('vendor_id', selectedVendorId);
+        if (error) throw error;
+        addLog(`Pedidos do quiosque ${selectedVendorId.slice(0, 5)} removidos`, 'success');
+      }
     } catch (error: any) {
-      addLog(`Erro ao limpar base: ${error.message}`, 'error');
+      addLog(`Erro na limpeza: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkConnection = async () => {
+    if (!supabase) return;
+    setLoading(true);
+    addLog('Testando comunicação em tempo real...', 'info');
+    try {
+      const start = Date.now();
+      const { data, error } = await supabase.from('vendors').select('count');
+      const latency = Date.now() - start;
+      if (error) throw error;
+      addLog(`Conexão OK! Latência: ${latency}ms`, 'success');
+    } catch (error: any) {
+      addLog(`Falha de Conexão: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -116,43 +174,74 @@ export default function TestPlayground() {
         <div className="space-y-6">
           <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
             <h2 className="font-bold text-dark mb-6 flex items-center gap-2">
-              <Play className="text-primary" size={20} /> Ações de Fluxo
+              <ShieldCheck className="text-primary" size={20} /> Admin & Suporte
             </h2>
             
-            <div className="space-y-4">
-              <button 
-                onClick={simulateCustomerOrder}
-                disabled={loading}
-                className="w-full bg-dark text-white p-5 rounded-2xl font-bold flex items-center justify-between hover:scale-[1.02] transition-all disabled:opacity-50"
-              >
-                <div className="flex items-center gap-3">
-                   <div className="bg-primary p-2 rounded-lg">
-                      <ShoppingBag size={20} />
-                   </div>
-                   <div className="text-left">
-                      <div className="text-sm">Simular Cliente</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Cria um pedido aleatório</div>
-                   </div>
-                </div>
-                {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-              </button>
+            <div className="space-y-6">
+              {/* Seleção de Quiosque */}
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Quiosque Alvo</label>
+                <select 
+                  value={selectedVendorId}
+                  onChange={(e) => setSelectedVendorId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Selecione um Quiosque</option>
+                  {vendors.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
 
-              <button 
-                onClick={cleanDatabase}
-                disabled={loading}
-                className="w-full bg-gray-50 text-gray-500 p-5 rounded-2xl font-bold flex items-center justify-between hover:bg-red-50 hover:text-red-500 transition-all border border-gray-100"
-              >
-                <div className="flex items-center gap-3">
-                   <div className="bg-white p-2 rounded-lg border border-gray-100">
-                      <Trash2 size={20} />
-                   </div>
-                   <div className="text-left">
-                      <div className="text-sm">Zerar Pedidos</div>
-                      <div className="text-[10px] opacity-60 font-normal">Limpa a tabela de ordens</div>
-                   </div>
-                </div>
-                <Database size={20} />
-              </button>
+              {/* Senha Admin */}
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Chave Mestra Admin (Senha)</label>
+                <input 
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={simulateCustomerOrder}
+                  disabled={loading}
+                  className="bg-dark text-white p-4 rounded-2xl font-bold text-xs flex flex-col items-center justify-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50"
+                >
+                  <ShoppingBag size={18} />
+                  Simular Pedido
+                </button>
+
+                <button 
+                  onClick={checkConnection}
+                  disabled={loading}
+                  className="bg-primary text-white p-4 rounded-2xl font-bold text-xs flex flex-col items-center justify-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50"
+                >
+                  <RefreshCcw className={loading ? 'animate-spin' : ''} size={18} />
+                  Testar Conexão
+                </button>
+
+                <button 
+                  onClick={() => cleanDatabase('vendor')}
+                  disabled={loading}
+                  className="bg-orange-50 text-orange-600 border border-orange-100 p-4 rounded-2xl font-bold text-[10px] flex flex-col items-center justify-center gap-2 hover:bg-orange-100 transition-all disabled:opacity-50"
+                >
+                  <Trash2 size={18} />
+                  Limpar Quiosque
+                </button>
+
+                <button 
+                  onClick={() => cleanDatabase('global')}
+                  disabled={loading}
+                  className="bg-red-50 text-red-600 border border-red-100 p-4 rounded-2xl font-bold text-[10px] flex flex-col items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"
+                >
+                  <AlertCircle size={18} />
+                  RESET GLOBAL
+                </button>
+              </div>
             </div>
           </div>
 
