@@ -41,19 +41,35 @@ export default function MenuManagement() {
   const categories = ['Todos', 'Bebidas', 'Petiscos', 'Refeições', 'Sobremesas'];
 
   useEffect(() => {
+    const fetchVendors = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from('vendors').select('*');
+      setVendors(data || []);
+      if (data?.length) setSelectedVendorId(data[0].id);
+    };
     fetchVendors();
   }, [supabase]);
 
-  const fetchVendors = async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('vendors').select('*');
-    setVendors(data || []);
-    if (data?.length) setSelectedVendorId(data[0].id);
-  };
-
   useEffect(() => {
+    const fetchItems = async () => {
+      if (!supabase || !selectedVendorId) return;
+      try {
+        const { data, error } = await supabase
+          .from('menu_items')
+          .select('*')
+          .eq('vendor_id', selectedVendorId)
+          .order('category', { ascending: true })
+          .order('name', { ascending: true });
+        if (error) throw error;
+        setItems(data || []);
+      } catch (error) {
+        console.error('Erro ao buscar cardápio:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
     if (selectedVendorId) fetchItems();
-  }, [selectedVendorId]);
+  }, [selectedVendorId, supabase]);
 
   const fetchItems = async () => {
     if (!supabase || !selectedVendorId) return;

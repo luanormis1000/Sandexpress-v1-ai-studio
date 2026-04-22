@@ -181,7 +181,7 @@ function KioskOrderContent() {
         </div>
         <h1 className="text-2xl font-black text-dark mb-4 italic">Ops! Você já está em outro Quiosque</h1>
         <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto mb-10">
-          Identificamos que você abriu uma conta no quiosque <span className="font-bold text-primary">"{localStorage.getItem('active_kiosk_name')}"</span>.
+          Identificamos que você abriu uma conta no quiosque <span className="font-bold text-primary">&quot;{localStorage.getItem('active_kiosk_name')}&quot;</span>.
           <br /><br />
           Para evitar erros nos seus pedidos, encerre sua conta lá antes de abrir em um novo quiosque.
         </p>
