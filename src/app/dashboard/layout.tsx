@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChefHat, Settings, LayoutDashboard, QrCode } from 'lucide-react';
+import { ChefHat, Settings, LayoutDashboard, QrCode, ShoppingBag, BarChart3, Database, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardLayout({
@@ -16,9 +16,14 @@ export default function DashboardLayout({
         <div className="text-2xl font-display font-bold text-primary mb-12">SandExpress</div>
         
         <nav className="space-y-2 flex-grow">
+          <DashboardLink href="/dashboard/kiosks" icon={<LayoutDashboard size={20} />} label="Meus Quiosques" />
+          <DashboardLink href="/dashboard/mapa" icon={<MapPin size={20} />} label="Mapa de Área" />
           <DashboardLink href="/dashboard/pedidos" icon={<ChefHat size={20} />} label="Pedidos" />
+          <DashboardLink href="/dashboard/cardapio" icon={<ShoppingBag size={20} />} label="Cardápio" />
+          <DashboardLink href="/dashboard/relatorios" icon={<BarChart3 size={20} />} label="Relatórios" />
           <DashboardLink href="/dashboard/configuracoes" icon={<Settings size={20} />} label="Configurações" />
           <DashboardLink href="/dashboard/qrcode" icon={<QrCode size={20} />} label="Gerar QR Codes" />
+          <DashboardLink href="/dashboard/test" icon={<Database size={20} />} label="Testes" />
         </nav>
 
         <div className="pt-6 border-t border-white/10">

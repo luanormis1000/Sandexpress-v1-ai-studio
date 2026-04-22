@@ -1,152 +1,185 @@
-import React from 'react';
-import { Check, QrCode, ShoppingBag, BarChart3, Clock } from 'lucide-react';
+'use client';
 
-const steps = [
-  { t: "QR Code no Guarda-sol", d: "Cada guarda-sol recebe um código exclusivo para identificação automática da mesa." },
-  { t: "Cliente Acessa o Menu", d: "O cliente escaneia o código com o celular e vê seu cardápio com fotos e preços." },
-  { t: "Pedido Realizado", d: "O pedido chega instantaneamente no seu painel de controle ou impressora." },
-  { t: "Entrega Rápida", d: "Sua equipe entrega o pedido diretamente no guarda-sol certo, sem confusão." }
-];
-
-const benefits = [
-  { title: "Pedidos via QR Code", desc: "Seus clientes pedem sem precisar chamar o garçom." },
-  { title: "Gestão em Tempo Real", desc: "Acompanhe todos os pedidos e faturamento ao vivo." },
-  { title: "Cardápio Digital", desc: "Atualize preços e itens em segundos, sem imprimir nada." },
-  { title: "Relatórios de Vendas", desc: "Descubra quais produtos vendem mais e horários de pico." }
-];
-
-const plans = [
-  { name: "Trial", price: "Grátis", desc: "Para conhecer a plataforma", features: ["Até 5 guarda-sóis", "Pedidos ilimitados", "Todas as funcionalidades"] },
-  { name: "Mensal", price: "R$ 97", desc: "Ideal para testar a temporada", features: ["Até 50 guarda-sóis", "Pedidos ilimitados", "Relatórios completos"] },
-  { name: "Anual", price: "R$ 797", desc: "Para quem quer faturar o ano todo", features: ["Até 100 guarda-sóis", "Pedidos ilimitados", "QR codes personalizados"] }
-];
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { getSupabase } from '@/lib/supabase';
+import { 
+  Check, 
+  QrCode, 
+  ShoppingBag, 
+  BarChart3, 
+  Clock, 
+  ArrowRight, 
+  Store, 
+  Settings, 
+  MapPin, 
+  RefreshCw,
+  LayoutDashboard
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function Home() {
+  const supabase = getSupabase();
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeKiosk, setActiveKiosk] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchVendors();
+    if (typeof window !== 'undefined') {
+      setActiveKiosk(localStorage.getItem('active_kiosk_slug'));
+    }
+  }, [supabase]);
+
+  const fetchVendors = async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { data } = await supabase.from('vendors').select('*').order('name');
+      setVendors(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetSession = () => {
+    localStorage.removeItem('active_kiosk_slug');
+    localStorage.removeItem('active_kiosk_name');
+    setActiveKiosk(null);
+    alert('Sessão reiniciada! Agora você pode abrir qualquer quiosque.');
+  };
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#FDF8F3] font-sans">
       {/* Header */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-        <div className="text-2xl font-bold text-primary">SandExpress</div>
-        <div className="hidden md:flex gap-8">
-          <a href="#como-funciona" className="text-dark hover:text-primary transition-colors">Como funciona</a>
-          <a href="#beneficios" className="text-dark hover:text-primary transition-colors">Benefícios</a>
-          <a href="#planos" className="text-dark hover:text-primary transition-colors">Planos</a>
+      <nav className="flex items-center justify-between px-6 py-6 max-w-7xl mx-auto">
+        <div className="text-2xl font-black text-primary tracking-tighter flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white text-base">S</div>
+          SandExpress
         </div>
-        <button className="bg-primary hover:bg-primary-hover text-white px-6 py-2 rounded-full font-medium transition-colors">
-          Entrar
-        </button>
+        
+        <div className="flex gap-4">
+          <Link 
+            href="/dashboard/kiosks"
+            className="hidden md:flex bg-dark text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-xl shadow-orange-900/20 items-center gap-2"
+          >
+            <LayoutDashboard size={16} /> Painel Administrativo
+          </Link>
+          <button 
+            onClick={resetSession}
+            className="bg-white border border-gray-100 text-gray-400 p-3 rounded-2xl hover:text-primary transition-all"
+            title="Limpar sessão ativa"
+          >
+            <RefreshCw size={20} />
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
-      <section className="px-6 py-20 text-center max-w-4xl mx-auto">
-        <h1 className="text-5xl md:text-6xl font-display font-bold mb-6 tracking-tight leading-tight">
-          Seu quiosque vendendo mais, <span className="text-primary">sem esforço.</span>
+      <section className="px-6 py-20 text-center max-w-5xl mx-auto">
+        <div className="inline-block bg-orange-100 text-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-8 border border-orange-200">
+          🏖️ O Futuro dos Quiosques de Praia
+        </div>
+        <h1 className="text-5xl md:text-7xl font-display font-black mb-8 tracking-tighter leading-none text-dark">
+          Venda mais na <br/>
+          <span className="text-primary italic">beira do mar.</span>
         </h1>
-        <p className="text-lg text-gray-600 mb-10 leading-relaxed">
-          Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
+        <p className="text-lg text-dark/60 mb-12 leading-relaxed max-w-2xl mx-auto font-medium">
+          Sistema Multi-Quiosque pronto para escala. Gerencie de 1 a 100 unidades com isolamento total e visualização em tempo real.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="bg-primary hover:bg-primary-hover text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all">
-            Ver demonstração
-          </button>
-          <button className="bg-secondary text-dark px-8 py-4 rounded-xl font-bold text-lg hover:brightness-95 transition-all">
-            Teste Grátis 7 dias
-          </button>
-        </div>
-      </section>
 
-      {/* Como Funciona */}
-      <section id="como-funciona" className="bg-gray-50 py-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-display font-bold mb-4">Em 4 passos simples</h2>
-            <p className="text-gray-600">O fluxo perfeito para o seu cliente pedir sem complicação.</p>
-          </div>
-          <div className="grid md:grid-cols-4 gap-8">
-            {steps.map((step, i) => (
-              <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-                <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6 font-bold text-xl">
-                  {i + 1}
-                </div>
-                <h3 className="font-bold mb-3">{step.t}</h3>
-                <p className="text-sm text-gray-600 line-clamp-3">{step.d}</p>
+        {/* Central de Operações do Preview */}
+        <div className="grid md:grid-cols-2 gap-8 mt-16 text-left">
+          {/* Lado do Cliente */}
+          <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
+            <h2 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+              <ShoppingBag className="text-primary" size={28} /> Visão do Cliente
+            </h2>
+            
+            {loading ? (
+              <div className="animate-pulse space-y-3">
+                <div className="h-12 bg-gray-100 rounded-2xl"></div>
+                <div className="h-12 bg-gray-100 rounded-2xl"></div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefícios */}
-      <section id="beneficios" className="py-20 px-6">
-        <div className="max-w-7xl mx-auto text-center mb-16">
-          <h2 className="text-3xl font-display font-bold mb-4">Tudo que você precisa</h2>
-          <p className="text-gray-600">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-          {benefits.map((b, i) => (
-            <div key={i} className="text-left p-6">
-              <div className="w-12 h-12 bg-secondary text-dark rounded-xl flex items-center justify-center mb-4">
-                {i === 0 && <QrCode size={24} />}
-                {i === 1 && <BarChart3 size={24} />}
-                {i === 2 && <ShoppingBag size={24} />}
-                {i === 3 && <Clock size={24} />}
-              </div>
-              <h3 className="font-bold mb-2">{b.title}</h3>
-              <p className="text-sm text-gray-600">{b.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Planos */}
-      <section id="planos" className="bg-gray-50 py-20 px-6">
-        <div className="max-w-7xl mx-auto text-center mb-16">
-          <h2 className="text-3xl font-display font-bold mb-4">Planos que cabem no seu bolso</h2>
-          <p className="text-gray-600">Comece com 7 dias grátis. Sem surpresas.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          {plans.map((plan, i) => (
-            <div key={i} className={`bg-white p-10 rounded-3xl shadow-sm flex flex-col ${i === 1 ? 'ring-2 ring-primary scale-105 shadow-xl relative z-10' : 'border border-gray-100'}`}>
-              <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-              <div className="text-4xl font-display font-bold mb-4">{plan.price}</div>
-              <p className="text-sm text-gray-400 mb-8">{plan.desc}</p>
-              <ul className="space-y-4 mb-10 flex-grow">
-                {plan.features.map((f, j) => (
-                  <li key={j} className="flex items-center gap-3 text-sm text-gray-600">
-                    <Check className="text-primary" size={18} />
-                    {f}
-                  </li>
+            ) : vendors.length > 0 ? (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-4">Selecione um quiosque para simular:</p>
+                {vendors.map(v => (
+                  <Link 
+                    key={v.id}
+                    href={`/k/${v.slug}/pedido?mesa=1`}
+                    className="flex items-center justify-between p-5 bg-orange-50/50 rounded-[25px] border border-orange-100 hover:border-primary transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm">
+                        <Store size={20} />
+                      </div>
+                      <span className="font-bold text-dark">{v.name}</span>
+                    </div>
+                    <ArrowRight size={18} className="text-orange-200 group-hover:text-primary transition-colors" />
+                  </Link>
                 ))}
-              </ul>
-              <button className={`w-full py-4 rounded-xl font-bold transition-all ${i === 1 ? 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20' : 'bg-gray-100 text-dark hover:bg-gray-200'}`}>
-                Começar agora
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
+                {activeKiosk && (
+                  <div className="mt-6 p-4 bg-blue-50 text-blue-600 rounded-2xl text-[10px] font-bold uppercase tracking-widest border border-blue-100 flex items-center justify-between">
+                    <span>Sessão ativa em: {activeKiosk}</span>
+                    <button onClick={resetSession} className="underline">Trocar</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-gray-400 text-sm italic mb-6">Nenhum quiosque criado ainda.</p>
+                <Link 
+                  href="/dashboard/kiosks"
+                  className="bg-primary text-white px-8 py-4 rounded-2xl font-bold inline-block"
+                >
+                  Criar Primeiro Quiosque
+                </Link>
+              </div>
+            )}
+          </div>
 
-      {/* CTA Final */}
-      <section className="py-24 px-6 text-center bg-dark text-white overflow-hidden relative">
-        <div className="max-w-3xl mx-auto relative z-10">
-          <h2 className="text-4xl md:text-5xl font-display font-bold mb-8">Pronto para transformar seu atendimento?</h2>
-          <p className="text-gray-300 mb-10 text-lg">Comece agora com 7 dias grátis. Não precisa cartão de crédito.</p>
-          <button className="bg-primary text-white px-10 py-5 rounded-2xl font-bold text-xl hover:scale-105 active:scale-95 transition-all">
-            Criar conta agora
-          </button>
-        </div>
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary rounded-full blur-[120px]"></div>
+          {/* Lado do Operador */}
+          <div className="bg-dark p-10 rounded-[40px] shadow-2xl text-white">
+            <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-3">
+              <Settings className="text-primary" size={28} /> Painel do Quiosque
+            </h2>
+            <div className="grid grid-cols-1 gap-3">
+              <OperationLink href="/dashboard/kiosks" icon={<Store size={18} />} label="Gerenciar Unidades" />
+              <OperationLink href="/dashboard/mapa" icon={<MapPin size={18} />} label="Mapa de Área (Novidade)" />
+              <OperationLink href="/dashboard/pedidos" icon={<ShoppingBag size={18} />} label="Painel de Pedidos" />
+              <OperationLink href="/dashboard/qrcode" icon={<QrCode size={18} />} label="Gerador QR Codes" />
+              <OperationLink href="/dashboard/relatorios" icon={<BarChart3 size={18} />} label="Relatórios e Vendas" />
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-xl font-bold text-primary">SandExpress</div>
-          <p className="text-gray-400 text-sm">© {new Date().getFullYear()} SandExpress. Todos os direitos reservados.</p>
+      <footer className="py-20 px-6 border-t border-gray-100 text-center">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-xl font-black text-primary mb-4">SandExpress</div>
+          <p className="text-gray-400 text-sm">A solução Definitiva para Gestão de Praia e Multi-Quiosques.</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function OperationLink({ href, icon, label }: { href: string, icon: React.ReactNode, label: string }) {
+  return (
+    <Link 
+      href={href}
+      className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary transition-all group"
+    >
+      <div className="p-2 bg-primary rounded-xl group-hover:scale-110 transition-transform">
+        {icon}
+      </div>
+      <span className="font-bold text-sm">{label}</span>
+    </Link>
   );
 }

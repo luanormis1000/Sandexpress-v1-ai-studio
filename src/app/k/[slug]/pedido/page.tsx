@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getSupabase } from '@/lib/supabase';
-import { useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { 
   Plus, 
   Minus, 
@@ -12,10 +12,10 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
 import { Suspense } from 'react';
 
 interface MenuItem {
@@ -25,52 +25,80 @@ interface MenuItem {
   price: number;
   category: string;
   image_url: string;
+  vendor_id?: string;
 }
 
-export default function OrderPage() {
+interface Vendor {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+}
+
+export default function KioskOrderPage() {
   return (
-    <Suspense fallback={<div className="p-10 text-center">Carregando cardápio...</div>}>
-      <OrderContent />
+    <Suspense fallback={<div className="p-10 text-center">Carregando cardápio do quiosque...</div>}>
+      <KioskOrderContent />
     </Suspense>
   );
 }
 
-function OrderContent() {
+function KioskOrderContent() {
   const supabase = getSupabase();
+  const params = useParams();
   const searchParams = useSearchParams();
+  const slug = params?.slug as string;
   const tableNumber = searchParams.get('mesa') || '0';
   
-  const [settings, setSettings] = useState({
-    vendor_name: 'SandExpress',
-    logo_url: '',
-    primary_color: '#FF6B00',
-    secondary_color: '#3D1A0A',
-  });
-
+  const [vendor, setVendor] = useState<Vendor | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'locked'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    // Check if user is locked to another kiosk
+    const activeKiosk = localStorage.getItem('active_kiosk_slug');
+    if (activeKiosk && activeKiosk !== slug) {
+      setOrderStatus('locked');
+    }
+    
     const fetchData = async () => {
-      if (!supabase) return;
+      if (!supabase || !slug) return;
       
       try {
-        // Fetch Settings
-        const { data: settingsData } = await supabase.from('settings').select('*').single();
-        if (settingsData) setSettings(settingsData);
+        // Fetch Vendor by Slug
+        const { data: vendorData, error: vendorError } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('slug', slug)
+          .single();
 
-        // Fetch Menu Items
+        if (vendorError || !vendorData) {
+          console.error('Quiosque não encontrado');
+          setLoading(false);
+          return;
+        }
+        setVendor(vendorData);
+
+        // Fetch Menu Items for this vendor
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
           .select('*')
+          .eq('vendor_id', vendorData.id)
           .order('category', { ascending: true });
         
         if (itemsError) throw itemsError;
         setItems(itemsData || []);
+        
+        // Auto-lock user to this kiosk if they start browsing
+        localStorage.setItem('active_kiosk_slug', slug);
+        localStorage.setItem('active_kiosk_name', vendorData.name);
+
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
       } finally {
@@ -78,7 +106,7 @@ function OrderContent() {
       }
     };
     fetchData();
-  }, [supabase]);
+  }, [supabase, slug]);
 
   const addToCart = (item: MenuItem) => {
     setCart(prev => {
@@ -104,22 +132,26 @@ function OrderContent() {
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   const submitOrder = async () => {
-    if (!supabase || cart.length === 0) return;
+    if (!supabase || cart.length === 0 || !vendor) return;
     setOrderStatus('submitting');
     
     try {
       const { error } = await supabase
         .from('orders')
         .insert({
+          vendor_id: vendor.id,
           table_number: tableNumber,
           items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity })),
           total: total,
-          status: 'pendente'
+          status: 'pendente',
+          created_at: new Date().toISOString()
         });
 
       if (error) throw error;
       setOrderStatus('success');
       setCart([]);
+      
+      // Cleanup happens after some time or manual action
       setTimeout(() => {
         setIsCartOpen(false);
         setOrderStatus('idle');
@@ -138,24 +170,70 @@ function OrderContent() {
   }, {});
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen text-gray-500 font-medium">Carregando cardápio...</div>;
+    return <div className="flex items-center justify-center min-h-screen text-gray-500 font-medium">Carregando quiosque...</div>;
   }
 
+  if (orderStatus === 'locked') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-10 text-center bg-white">
+        <div className="w-24 h-24 bg-orange-100 text-orange-500 rounded-[35px] flex items-center justify-center mb-8 shadow-xl">
+          <Lock size={48} />
+        </div>
+        <h1 className="text-2xl font-black text-dark mb-4 italic">Ops! Você já está em outro Quiosque</h1>
+        <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto mb-10">
+          Identificamos que você abriu uma conta no quiosque <span className="font-bold text-primary">"{localStorage.getItem('active_kiosk_name')}"</span>.
+          <br /><br />
+          Para evitar erros nos seus pedidos, encerre sua conta lá antes de abrir em um novo quiosque.
+        </p>
+        <button 
+          onClick={() => {
+            if(confirm('Isso limpará sua sacola do outro quiosque. Deseja continuar?')) {
+              localStorage.removeItem('active_kiosk_slug');
+              localStorage.removeItem('active_kiosk_name');
+              setOrderStatus('idle');
+              window.location.reload();
+            }
+          }}
+          className="bg-primary text-white px-8 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-orange-200"
+        >
+          Encerrar Outra Conta e Abrir Aqui
+        </button>
+      </div>
+    );
+  }
+
+  if (!vendor) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <AlertCircle size={64} className="text-red-500 mb-4" />
+        <h1 className="text-2xl font-bold text-dark">Quiosque não encontrado</h1>
+        <p className="text-gray-500 mt-2">O link que você acessou parece ser inválido ou o quiosque foi desativado.</p>
+        <button onClick={() => window.location.href = '/'} className="mt-8 bg-primary text-white px-8 py-3 rounded-2xl font-bold">Voltar ao Início</button>
+      </div>
+    );
+  }
+
+  // Use vendor colors if available, otherwise defaults
+  const brandColors = {
+    primary: vendor.primary_color || '#FF6B00',
+    secondary: vendor.secondary_color || '#3D1A0A'
+  };
+
   return (
-    <div className="min-h-screen bg-[#FDF8F3] pb-32 font-sans" style={{ '--primary': settings.primary_color, '--dark': settings.secondary_color } as any}>
+    <div className="min-h-screen bg-[#FDF8F3] pb-32 font-sans" style={{ '--primary': brandColors.primary, '--dark': brandColors.secondary } as any}>
       {/* Header Fixo */}
       <header className="sticky top-0 bg-white/90 backdrop-blur-md shadow-sm z-30 pt-4 pb-2 border-b border-orange-100">
         <div className="max-w-xl mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {settings.logo_url ? (
-               <img src={settings.logo_url} alt="Logo" className="h-10 w-auto" />
+            {vendor.logo_url ? (
+               <img src={vendor.logo_url} alt="Logo" className="h-10 w-auto" />
             ) : (
                <div className="w-10 h-10 bg-[var(--primary)] rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-orange-200">
-                 S
+                 {vendor.name[0]}
                </div>
             )}
             <div>
-              <h1 className="text-lg font-display font-bold text-[var(--dark)] leading-none">{settings.vendor_name}</h1>
+              <h1 className="text-lg font-display font-bold text-[var(--dark)] leading-none">{vendor.name}</h1>
               <span className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">Quiosque de Praia</span>
             </div>
           </div>
@@ -170,7 +248,7 @@ function OrderContent() {
              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300" size={18} />
              <input 
                type="text" 
-               placeholder="O que vamos pedir hoje?"
+               placeholder="Pesquisar no cardápio..."
                value={searchQuery}
                onChange={(e) => setSearchQuery(e.target.value)}
                className="w-full bg-orange-50/50 pl-12 pr-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all border border-orange-100/50 text-sm"
@@ -179,7 +257,7 @@ function OrderContent() {
         </div>
 
         {/* Navegação de Categorias */}
-        <div className="max-w-xl mx-auto px-6 mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-2">
+        <div className="max-w-xl mx-auto px-6 mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-2 scrollbar-hide">
           {['Tudo', ...Object.keys(groupedItems).sort()].map(cat => (
             <button
               key={cat}
@@ -241,14 +319,12 @@ function OrderContent() {
                         </div>
                       )}
                       
-                      {/* Botão de Adição Rápida */}
                       <div className="absolute bottom-3 right-3">
                         <div className="w-12 h-12 bg-white shadow-xl rounded-[20px] flex items-center justify-center text-[var(--primary)] transition-all active:scale-90 border border-orange-50">
                           <Plus size={24} strokeWidth={3} />
                         </div>
                       </div>
 
-                      {/* Tag de preço sobreposta */}
                       <div className="absolute top-3 left-3">
                         <div className="bg-[var(--dark)]/90 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-[11px] font-black shadow-lg">
                           R$ {item.price.toFixed(2)}
@@ -336,6 +412,15 @@ function OrderContent() {
                    </div>
                    <h3 className="text-2xl font-black text-[var(--dark)] mb-3">Pedido Recebido!</h3>
                    <p className="text-gray-500 max-w-[240px] mx-auto text-sm leading-relaxed">Já estamos preparando tudo com muito carinho.</p>
+                   <button 
+                     onClick={() => {
+                        localStorage.removeItem('active_kiosk_slug');
+                        window.location.reload();
+                     }}
+                     className="mt-6 text-xs text-primary font-bold underline"
+                   >
+                     Encerrar Sessão neste Quiosque
+                   </button>
                 </div>
               ) : (
                 <>
